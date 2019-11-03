@@ -41,6 +41,10 @@ impl EventHandler for Handler {
         let user_arc;
         let user;
 
+        if let Some(_old) = old {
+            return;
+        }
+
         match member {
             Some(member) => {
                 user_arc = Arc::clone(&member.user);
@@ -52,10 +56,6 @@ impl EventHandler for Handler {
             },
         }
 
-        if let Some(_old) = old {
-            return;
-        }
-
         match new.channel_id {
             Some(channel_id) => {
                 // Play Ringtone.
@@ -65,8 +65,8 @@ impl EventHandler for Handler {
                 if manager.join(guild_id.unwrap(), channel_id).is_some() {
                     if let Some(handler) = manager.get_mut(guild_id.unwrap()) {
                         let ext: &str = ".mp3";
-                        let folder: &str = "ringtone/";
-                        let source = match voice::ffmpeg(format!("{}{}{}", folder, user.name, ext)) {
+                        let folder: &str = "/usr/etc/IBRd/ringtone/";
+                        let source = match voice::ffmpeg(format!("{}{}/{}{}", folder, cache.guild(guild_id.unwrap()).unwrap().read().name, user.name, ext)) {
                             Ok(source) => source,
                             Err(why) => {
                                 println!("Err starting source: {:?}", why);
@@ -85,7 +85,7 @@ impl EventHandler for Handler {
 group!({
     name: "general",
     options: {},
-    commands: [join, leave, mute, play, ping, unmute, upload]
+    commands: [join, leave, mute, play, ping, unmute, upload, help]
 });
 
 fn main() {
@@ -294,8 +294,16 @@ fn unmute(ctx: &mut Context, msg: &Message) -> CommandResult {
 
 #[command]
 fn upload(context: &mut Context, message: &Message) -> CommandResult {
-    let folder: &str = "ringtone/";
+    let cache = context.cache.read();
+    let folder: &str = "/usr/etc/IBRd/ringtone/";
     let ext: &str = ".mp3";
+
+    match std::fs::create_dir(format!("{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name)) {
+        Err(why) => {
+            println!("! {:?}", why.kind());
+        },
+        Ok(_) => {},
+    }
 
     for attachment in &message.attachments {
         let content = match attachment.download() {
@@ -308,7 +316,7 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
             },
         };
 
-        let mut file = match File::create(format!("{}{}{}", folder, message.author.name, ext)) {
+        let mut file = match File::create(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
             Ok(file) => file,
             Err(why) => {
                 println!("Error creating file: {:?}", why);
@@ -324,11 +332,24 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
             return Ok(());
         }
 
-        let _ = message.channel_id.say(&context.http, &format!("Saved {:?}", message.author.name));
+        let _ = message.channel_id.say(&context.http, &format!("Saved {}/{}{}", cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext));
     }
 
     Ok(())
 }
+
+#[command]
+fn help(context: &mut Context, message: &Message) -> CommandResult{
+    let _ = message.channel_id.say(&context.http, &format!("
+        ID By Ringtone
+        コマンド: join, leave, mute, play, ping, unmute, upload, help
+        Usage: ~[Command]
+        メモ: uploadコマンドは.mp3ファイルをアップする際のコメントとして入力してください
+        "));
+
+    Ok(())
+}
+
 
 /// Checks that a message successfully sent; if not, then logs why to stdout.
 fn check_msg(result: SerenityResult<Message>) {
