@@ -66,7 +66,7 @@ impl EventHandler for Handler {
                 if manager.join(guild_id.unwrap(), channel_id).is_some() {
                     if let Some(handler) = manager.get_mut(guild_id.unwrap()) {
                         let ext: &str = ".mp3";
-                        let folder: &str = "/usr/etc/IBRd/ringtone/";
+                        let folder: &str = "/home/sshuser/IBRd/ringtone/";
                         let source = match voice::ffmpeg(format!("{}{}/{}{}", folder, cache.guild(guild_id.unwrap()).unwrap().read().name, user.name, ext)) {
                             Ok(source) => source,
                             Err(why) => {
@@ -296,7 +296,7 @@ fn unmute(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[command]
 fn upload(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
-    let folder: &str = "/usr/etc/IBRd/ringtone/";
+    let folder: &str = "/home/sshuser/IBRd/ringtone/";
     let ext: &str = ".mp3";
 
     match std::fs::create_dir(format!("{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name)) {
@@ -342,7 +342,7 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
 #[command]
 fn delete(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
-    let folder: &str = "~/IBRd/ringtone/";
+    let folder: &str = "/home/sshuser/IBRd/ringtone/";
     let ext: &str = ".mp3";
     
     let file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
