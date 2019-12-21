@@ -339,6 +339,35 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
 }
 
 #[command]
+fn delete(context: &mut Context, message: &Message) -> CommandResult {
+    let cache = context.cache.read();
+    let folder: &str = "/usr/etc/IBRd/ringtone/";
+    let ext: &str = ".mp3";
+
+    match std::fs::create_dir(format!("{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name)) {
+        Err(why) => {
+            println!("! {:?}", why.kind());
+        },
+        Ok(_) => {},
+    }
+
+    match std::fs::remove_file(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
+        Ok(_) => {},
+        Err(why) => {
+            println!("Error deleting file: {:?}", why);
+            let _ = message.channel_id.say(&context.http, "Error deleting file");
+
+            return Ok(());
+        },
+    };
+
+    let _ = message.channel_id.say(&context.http, &format!("Deleted {}/{}{}", cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext));
+
+
+    Ok(())
+}
+
+#[command]
 fn help(context: &mut Context, message: &Message) -> CommandResult{
     let _ = message.channel_id.say(&context.http, &format!("
         ID By Ringtone
