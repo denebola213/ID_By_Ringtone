@@ -344,13 +344,6 @@ fn delete(context: &mut Context, message: &Message) -> CommandResult {
     let folder: &str = "/usr/etc/IBRd/ringtone/";
     let ext: &str = ".mp3";
 
-    match std::fs::create_dir(format!("{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name)) {
-        Err(why) => {
-            println!("! {:?}", why.kind());
-        },
-        Ok(_) => {},
-    }
-
     match std::fs::remove_file(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
         Ok(_) => {},
         Err(why) => {
@@ -362,7 +355,6 @@ fn delete(context: &mut Context, message: &Message) -> CommandResult {
     };
 
     let _ = message.channel_id.say(&context.http, &format!("Deleted {}/{}{}", cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext));
-
 
     Ok(())
 }
