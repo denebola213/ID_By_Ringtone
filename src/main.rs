@@ -342,10 +342,10 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
 #[command]
 fn delete(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
-    let folder: &str = "/usr/etc/IBRd/ringtone/";
+    let folder: &str = "~/IBRd/ringtone/";
     let ext: &str = ".mp3";
     
-    let mut file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
+    let file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
         Ok(file) => file,
         Err(why) => {
             let _ = message.channel_id.say(&context.http, "Specified file does not exist");
