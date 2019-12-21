@@ -85,7 +85,7 @@ impl EventHandler for Handler {
 group!({
     name: "general",
     options: {},
-    commands: [join, leave, mute, play, ping, unmute, upload, help]
+    commands: [join, leave, mute, play, ping, unmute, upload, delete, help]
 });
 
 fn main() {
