@@ -1,4 +1,5 @@
 use std::{env, sync::Arc, fs::File, io::Write};
+use std::os::unix::fs::PermissionsExt;
 
 use serenity::client::bridge::voice::ClientVoiceManager;
 
@@ -343,6 +344,25 @@ fn delete(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
     let folder: &str = "/usr/etc/IBRd/ringtone/";
     let ext: &str = ".mp3";
+    
+    let mut file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
+        Ok(file) => file,
+        Err(why) => {
+            let _ = message.channel_id.say(&context.http, "Specified file does not exist");
+
+            return Ok(());
+        },
+    };
+
+    match file.set_permissions(PermissionsExt::from_mode(0o777)) {
+        Ok(_) => {},
+        Err(why) => {
+            println!("Error changing file permission: {:?}", why);
+            let _ = message.channel_id.say(&context.http, "Error deleting file");
+
+            return Ok(());
+        },
+    };
 
     match std::fs::remove_file(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
         Ok(_) => {},
