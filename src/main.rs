@@ -3,12 +3,10 @@ use std::os::unix::fs::PermissionsExt;
 
 use serenity::client::bridge::voice::ClientVoiceManager;
 
-use serenity::{client::Context, prelude::Mutex};
-use serenity::model::id::GuildId;
-use serenity::model::voice::VoiceState;
+use serenity::prelude::Mutex;
 
 use serenity::{
-    client::{Client, EventHandler},
+    client::{Client, EventHandler, Context},
     framework::{
         StandardFramework,
         standard::{
@@ -16,7 +14,7 @@ use serenity::{
             macros::{command, group},
         },
     },
-    model::{channel::Message, gateway::Ready, misc::Mentionable},
+    model::{channel::Message, gateway::Ready, misc::Mentionable, id::GuildId, voice::VoiceState},
     Result as SerenityResult,
     voice,
 };
@@ -36,51 +34,84 @@ impl EventHandler for Handler {
     fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
+
     fn voice_state_update(&self, ctx: Context, guild_id:Option<GuildId>, old: Option<VoiceState>, new: VoiceState) {
         let cache = ctx.cache.read();
-        let member = cache.member(guild_id.unwrap(), new.user_id);
         let user_arc;
-        let user;
-
-        if let Some(_old) = old {
-            return;
-        }
-
-        match member {
+        let user = match cache.member(guild_id.unwrap(), new.user_id){
             Some(member) => {
                 user_arc = Arc::clone(&member.user);
-                user = user_arc.read();
+                user_arc.read()
             },
-            None => {
-                println!("None Member");
-                return;
-            },
-        }
+            None          => return,
+        };
+        let guild_name = cache.guild(guild_id.unwrap()).unwrap().read().name.clone();
+        let manager_lock = ctx.data.read().get::<VoiceManager>().cloned()
+        .expect("Expected VoiceManager in ShareMap.");
+        let mut manager = manager_lock.lock();
+        
+        if old.is_some() {
+            // すでにどこかのチャンネルに接続していた場合.
+            match new.channel_id {
+                Some(channel_id) => {
+                    if let Some(old_channel) = old.unwrap().channel_id {
+                        if channel_id != old_channel {
+                            // 以前のチャンネルと異なる.
+                            manager.join(guild_id.unwrap(), channel_id).unwrap();
 
-        match new.channel_id {
-            Some(channel_id) => {
-                // Play Ringtone.
-                let manager_lock = ctx.data.read().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
-                let mut manager = manager_lock.lock();
-
-                if manager.join(guild_id.unwrap(), channel_id).is_some() {
-                    if let Some(handler) = manager.get_mut(guild_id.unwrap()) {
-                        let ext: &str = ".mp3";
-                        let folder: &str = "/home/sshuser/IBRd/ringtone/";
-                        let source = match voice::ffmpeg(format!("{}{}/{}{}", folder, cache.guild(guild_id.unwrap()).unwrap().read().name, user.name, ext)) {
-                            Ok(source) => source,
-                            Err(why) => {
-                                println!("Err starting source: {:?}", why);
-                                return;
-                            },
-                        };
-                        handler.play(source);
+                            match play_ringtone(manager.get_mut(guild_id.unwrap()).unwrap(), &guild_name, &user.name) {
+                                Ok(_) => (),
+                                Err(err_msg) => println!("{:?}", err_msg),
+                            }
+                            return;
+                        }
                     }
+                },
+                None             => {
+                    // 切断時.
+                    if let Some(guild_lock) = cache.channel(old.unwrap().channel_id.unwrap()).unwrap().guild() {
+                        if let Ok(connected_users) = &guild_lock.read().members(&ctx.cache) {
+                            let has_handler = manager.get(guild_id.unwrap()).is_some();
+                            if has_handler {
+                                if connected_users.len() == 1 {
+                                    // ボイスチャンネルにBotのみしかいない場合、切断する.
+                                    manager.remove(guild_id.unwrap());
+                                    println!("left channel");
+                                }
+                            } else {
+                                println!("Not in a voice channel");
+                            }
+                        }
+                    }
+                    return;
+                },
+            }
+        } else {
+            // ボイスチャンネルに接続したとき.
+            if let Some(channel_id) = new.channel_id {
+                manager.join(guild_id.unwrap(), channel_id).unwrap();
+                match play_ringtone(manager.get_mut(guild_id.unwrap()).unwrap(), &guild_name, &user.name) {
+                    Ok(_) => (),
+                    Err(err_msg) => println!("{:?}", err_msg),
                 }
-            },
-            None => (),
+            }
         }
     }
+}
+
+fn play_ringtone(handler: &mut voice::Handler, guild_name: &String, user_name: &String) -> Result<(), String> {
+    let ext: &str = ".mp3";
+    let folder    = env::var("RINGTONE_DIR")
+    .expect("Expected a token in the environment");
+
+    let source = match voice::ffmpeg(format!("{}{}/{}{}", folder, guild_name, user_name, ext)) {
+        Ok(source) => source,
+        Err(why) => {
+            return Err(format!("Err starting source: {:?}", why));
+        },
+    };
+    handler.play(source);
+    Ok(())
 }
 
 group!({
@@ -347,7 +378,7 @@ fn delete(context: &mut Context, message: &Message) -> CommandResult {
     
     let file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
         Ok(file) => file,
-        Err(why) => {
+        Err(_) => {
             let _ = message.channel_id.say(&context.http, "Specified file does not exist");
 
             return Ok(());
