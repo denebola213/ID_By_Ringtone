@@ -17,9 +17,9 @@ jobs:
       run: cargo build --verbose --release
       
     - name: Copy artifact
-      run: mkdir -p deb && cp target/release/id_by_ringtone deb/
+      run: mkdir -p release && cp target/release/id_by_ringtone release/
 
-    - uses: action/upload-artifact@v1
+    - uses: actions/upload-artifact@v1
       with:
         name: id_by_ringtone_${{ github.sha }}_amd64
-        path: deb
+        path: release
