@@ -102,7 +102,7 @@ impl EventHandler for Handler {
 fn play_ringtone(handler: &mut voice::Handler, guild_name: &String, user_name: &String) -> Result<(), String> {
     let ext: &str = ".mp3";
     let folder    = env::var("RINGTONE_DIR")
-    .expect("Expected a token in the environment");
+                    .expect("Expected a token in the environment");
 
     let source = match voice::ffmpeg(format!("{}{}/{}{}", folder, guild_name, user_name, ext)) {
         Ok(source) => source,
@@ -123,7 +123,7 @@ group!({
 fn main() {
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN")
-        .expect("Expected a token in the environment");
+                .expect("Expected a token in the environment");
     let mut client = Client::new(&token, Handler).expect("Err creating client");
 
     // Obtain a lock to the data owned by the client, and insert the client's
