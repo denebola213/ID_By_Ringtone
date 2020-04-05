@@ -1,6 +1,9 @@
 use std::{env, sync::Arc, fs::File, io::Write};
 use std::os::unix::fs::PermissionsExt;
 
+use std::thread;
+use std::time::Duration;
+
 use serenity::client::bridge::voice::ClientVoiceManager;
 
 use serenity::prelude::Mutex;
@@ -45,6 +48,11 @@ impl EventHandler for Handler {
             },
             None          => return,
         };
+
+        if user.bot {
+            return;
+        }
+
         let guild_name = cache.guild(guild_id.unwrap()).unwrap().read().name.clone();
         let manager_lock = ctx.data.read().get::<VoiceManager>().cloned()
         .expect("Expected VoiceManager in ShareMap.");
@@ -57,13 +65,16 @@ impl EventHandler for Handler {
                     if let Some(old_channel) = old.unwrap().channel_id {
                         if channel_id != old_channel {
                             // 以前のチャンネルと異なる.
+                            println!("move channel");
                             manager.join(guild_id.unwrap(), channel_id).unwrap();
-
+                            let handle = thread::spawn(move || {
+                                thread::sleep(Duration::from_secs(1));
+                            });
+                            handle.join().unwrap();
                             match play_ringtone(manager.get_mut(guild_id.unwrap()).unwrap(), &guild_name, &user.name) {
                                 Ok(_) => (),
                                 Err(err_msg) => println!("{:?}", err_msg),
                             }
-                            return;
                         }
                     }
                 },
@@ -90,6 +101,10 @@ impl EventHandler for Handler {
             // ボイスチャンネルに接続したとき.
             if let Some(channel_id) = new.channel_id {
                 manager.join(guild_id.unwrap(), channel_id).unwrap();
+                let handle = thread::spawn(move || {
+                    thread::sleep(Duration::from_secs(1));
+                });
+                handle.join().unwrap();
                 match play_ringtone(manager.get_mut(guild_id.unwrap()).unwrap(), &guild_name, &user.name) {
                     Ok(_) => (),
                     Err(err_msg) => println!("{:?}", err_msg),
@@ -327,7 +342,8 @@ fn unmute(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[command]
 fn upload(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
-    let folder: &str = "/home/sshuser/IBRd/ringtone/";
+    let folder = env::var("RINGTONE_DIR")
+                        .expect("Expected a token in the environment");;
     let ext: &str = ".mp3";
 
     match std::fs::create_dir(format!("{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name)) {
@@ -373,7 +389,8 @@ fn upload(context: &mut Context, message: &Message) -> CommandResult {
 #[command]
 fn delete(context: &mut Context, message: &Message) -> CommandResult {
     let cache = context.cache.read();
-    let folder: &str = "/home/sshuser/IBRd/ringtone/";
+    let folder = env::var("RINGTONE_DIR")
+                    .expect("Expected a token in the environment");;
     let ext: &str = ".mp3";
     
     let file = match File::open(format!("{}{}/{}{}", folder, cache.guild(message.guild_id.unwrap()).unwrap().read().name, message.author.name, ext)) {
